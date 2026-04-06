@@ -10,6 +10,11 @@ RUN apt-get update && apt-get install -y \
 # Set the working directory inside the container
 WORKDIR /app
 
+# RAM Optimizations for Python
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV PYTHONUNBUFFERED=1
+ENV PYTHONMALLOC=malloc
+
 # Copy the requirements file
 COPY requirements.txt .
 

@@ -173,12 +173,8 @@ def run_adversarial_fairness_test(resume_text, jd_text):
     """
     # First, find and remove any existing names from the resume
     # We'll replace them with our test names
-    import spacy
-    try:
-        nlp = spacy.load("en_core_web_sm")
-    except OSError:
-        # If spaCy model isn't loaded, return a basic result
-        return _default_fairness_result()
+    from nlp_analyzer import get_nlp
+    nlp = get_nlp()
     
     doc = nlp(resume_text[:500])  # Only scan first 500 chars for names
     

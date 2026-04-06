@@ -10,21 +10,17 @@ reflects actual technical requirement coverage.
 """
 
 import numpy as np
-from sentence_transformers import SentenceTransformer
 from sklearn.metrics.pairwise import cosine_similarity
-import spacy
 import re
 
-# Reuse the same model that similarity_model.py uses
-model = SentenceTransformer('all-MiniLM-L6-v2')
+# Lazy loaders for heavy models
+def _get_model():
+    from similarity_model import get_model
+    return get_model()
 
-# Load spaCy for sentence segmentation
-try:
-    nlp = spacy.load("en_core_web_sm")
-except OSError:
-    import subprocess, sys
-    subprocess.run([sys.executable, "-m", "spacy", "download", "en_core_web_sm"])
-    nlp = spacy.load("en_core_web_sm")
+def _get_nlp():
+    from nlp_analyzer import get_nlp
+    return get_nlp()
 
 # Import skill extractor to identify skill-bearing sentences
 from skill_extractor import extract_skills
@@ -35,7 +31,8 @@ def split_into_sentences(text):
     Splits text into clean sentences using spaCy's sentence segmenter.
     Falls back to regex if spaCy produces too few splits.
     """
-    doc = nlp(text)
+    nlp_instance = _get_nlp()
+    doc = nlp_instance(text)
     sentences = [sent.text.strip() for sent in doc.sents if len(sent.text.strip()) > 15]
     
     # Fallback: if spaCy gives us too few sentences, use regex
@@ -88,8 +85,9 @@ def build_cross_attention_matrix(resume_text, jd_text, strictness=50):
         return _empty_result()
     
     # Step 2: Encode all sentences into embedding vectors
-    resume_embeddings = model.encode(resume_sentences)
-    jd_embeddings = model.encode(jd_sentences)
+    model_instance = _get_model()
+    resume_embeddings = model_instance.encode(resume_sentences)
+    jd_embeddings = model_instance.encode(jd_sentences)
     
     # Step 3: Build the NxM attention matrix
     attention_matrix = cosine_similarity(resume_embeddings, jd_embeddings)
