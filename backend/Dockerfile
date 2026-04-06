@@ -1,6 +1,12 @@
 # Use an official lightweight Python image
 FROM python:3.10-slim
 
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    redis-server \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
 # Set the working directory inside the container
 WORKDIR /app
 
@@ -26,7 +32,10 @@ RUN pip install --no-cache-dir https://github.com/explosion/spacy-models/release
 COPY . .
 
 # Expose the FastAPI default port
-EXPOSE 8000
+EXPOSE 10000
 
-# Run the FastAPI server in production mode
-CMD ["uvicorn", "app:app", "--host", "0.0.0.0", "--port", "8000"]
+# Make start script executable
+RUN chmod +x start.sh
+
+# Run the All-in-One startup script
+CMD ["/bin/bash", "start.sh"]

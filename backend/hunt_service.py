@@ -8,9 +8,11 @@ import random
 import re
 
 # Connect to Redis as broker AND result backend
+# For All-in-One deployment, we use localhost
+redis_url = os.getenv('REDIS_URL', 'redis://127.0.0.1:6379/0')
 app = Celery('tasks', 
-             broker='redis://redis:6379/0',
-             backend='redis://redis:6379/0')
+             broker=redis_url,
+             backend=redis_url)
 
 app.conf.result_expires = 3600
 

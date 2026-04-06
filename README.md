@@ -268,23 +268,48 @@ If you are on Windows, you can use the provided shortcuts in the root directory:
 
 ---
 
-## ☁️ 8. Production Deployment (Railway)
+## ☁️ 8. Free Forever Deployment (Render + Vercel)
 
-This project is optimized for deployment on **Railway**. 
+This project is optimized for a **Zero-Cost** deployment using the "Hybrid Cloud" model. This avoids "Trial Limits" and keeps all features (Celery + Redis) active for free.
 
-### ⚙️ CI/CD Workflow
-We use **GitHub Actions** to automatically:
-1. **Lint** matching Python/JS code quality.
-2. **Build** Docker images to ensure deployability.
-3. **Cache** dependencies for 2x faster build times.
+### 🗺️ Infrastructure Strategy
+- **Frontend**: [Vercel](https://vercel.com) (Global CDN, $0)
+- **Backend + Redis + Worker**: [Render](https://render.com) (Standard Web Service, $0)
+  - We use a "Mega-Container" strategy that runs Redis and Celery inside the same instance to stay within the free tier.
 
-### 🚀 To Deploy:
-1. Connect your GitHub repository to [Railway.app](https://railway.app).
-2. Railway will automatically detect the `docker-compose.yml` and deploy the services.
-3. Add your `GROQ_API_KEY` to the Railway Environment Variables.
-```
+---
 
-> **💡 Tip**: The Dockerfile uses `pip install torch --index-url https://download.pytorch.org/whl/cpu` to keep the image under 1GB instead of 4GB+.
+### Step 1: Deploy Backend (Render)
+1. Sign up for a free account at [Render.com](https://render.com).
+2. Click **New +** -> **Web Service**.
+3. Connect your GitHub repository.
+4. Use these settings:
+   - **Name**: `resume-analyzer-backend`
+   - **Region**: Choose the one closest to you.
+   - **Runtime**: `Docker`
+   - **Plan**: `Free`
+5. Add **Environment Variables**:
+   - `GROQ_API_KEY`: Your key from [console.groq.com](https://console.groq.com).
+   - `PYTHONUNBUFFERED`: `1`
+6. Click **Create Web Service**. 
+   - *Note: Your URL will look like `https://xxx.onrender.com`. Copy this!*
+
+### Step 2: Deploy Frontend (Vercel)
+1. Sign up for a free account at [Vercel.com](https://vercel.com).
+2. Click **Add New** -> **Project**.
+3. Import your GitHub repository.
+4. In **Project Settings**, scroll to **Environment Variables**:
+   - **Key**: `VITE_API_URL`
+   - **Value**: `https://xxx.onrender.com/api/analyze` (Use your Render URL + `/api/analyze`)
+5. Click **Deploy**.
+
+---
+
+> [!IMPORTANT]
+> **Cold Starts**: Render's free tier "sleeps" after 15 minutes of inactivity. When you first visit your dashboard after a break, it might take ~30 seconds to wake up. This is normal.
+
+> [!TIP]
+> **All-in-One Container**: The Dockerfile automatically installs and manages its own internal Redis server, so you don't need any extra database accounts!
 
 ### B. Local Development (Without Docker)
 ```bash
