@@ -1,17 +1,22 @@
-import chromadb
+# Global holders for lazy initialization
 import os
+_chroma_client = None
+_memory_collection = None
 
-# Initialize local ChromaDB (this creates a folder inside the container to save your DB)
-chroma_client = chromadb.PersistentClient(path="./chroma_data")
-
-# Create or load the memory collection
-# Chroma automatically uses an embedding model under the hood to vectorize the text
-memory_collection = chroma_client.get_or_create_collection(name="resume_memories")
+def _get_collection():
+    """Initializes the ChromaDB client and collection only when needed."""
+    global _chroma_client, _memory_collection
+    if _memory_collection is None:
+        import chromadb
+        _chroma_client = chromadb.PersistentClient(path="./chroma_data")
+        _memory_collection = _chroma_client.get_or_create_collection(name="resume_memories")
+    return _memory_collection
 
 def initialize_memory():
     """Reads the master text file and loads it into the vector database."""
     # Check if we already loaded it to avoid duplicates
-    if memory_collection.count() > 0:
+    collection = _get_collection()
+    if collection.count() > 0:
         return
 
     if not os.path.exists("master_experience.txt"):
@@ -28,7 +33,7 @@ def initialize_memory():
     ids = [f"mem_{i}" for i in range(len(memories))]
     
     # Add to the database
-    memory_collection.add(
+    collection.add(
         documents=memories,
         ids=ids
     )
@@ -36,10 +41,11 @@ def initialize_memory():
 
 def retrieve_relevant_memory(target_skill: str) -> str:
     """Searches the database for the closest matching experience."""
-    if memory_collection.count() == 0:
+    collection = _get_collection()
+    if collection.count() == 0:
         return "No extended background context available."
 
-    results = memory_collection.query(
+    results = collection.query(
         query_texts=[target_skill],
         n_results=1 # Just get the single most relevant memory
     )

@@ -16,6 +16,7 @@ from explainability import build_cross_attention_matrix
 from bias_auditor import audit_job_description, run_adversarial_fairness_test
 
 app = FastAPI(title="AI Resume Analyzer API")
+print("🚀 FASTAPI APP INITIALIZED - WAITING FOR REQUESTS")
 
 # Update CORS for production
 # In production, Replace "*" with your actual frontend domain
@@ -128,8 +129,7 @@ from llm_rewriter import rewrite_bullet_point
 from rag_engine import initialize_memory, retrieve_relevant_memory # <-- IMPORT ADDED HERE
 import os
 
-# Boot up the Vector DB when the app starts
-initialize_memory()
+# Removed top-level initialize_memory() to save RAM during startup
 
 # Create a data model for the incoming React request
 class RewriteRequest(BaseModel):
@@ -145,6 +145,9 @@ async def rewrite_resume_bullet(request: RewriteRequest):
         raise HTTPException(status_code=500, detail="Groq API key is missing from the server.")
         
     try:
+        # 0. Lazy initialize memory if needed
+        initialize_memory()
+        
         # 1. Search the Vector DB for the missing skill
         print(f"Searching memory for: {request.target_skill}")
         memory = retrieve_relevant_memory(request.target_skill)
