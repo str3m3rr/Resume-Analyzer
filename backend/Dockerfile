@@ -30,6 +30,9 @@ RUN pip install --no-cache-dir https://github.com/explosion/spacy-models/release
 COPY download_models.py .
 RUN python download_models.py
 
+# Set default port
+ENV PORT=10000
+
 # Copy the rest of your Python files
 COPY . .
 

@@ -1,5 +1,8 @@
-# start.sh
 #!/bin/bash
+# start.sh
+
+# Ensure PORT is exported
+export PORT=${PORT:-10000}
 
 # Start Redis server in the background
 echo "🚀 Starting Redis server..."
@@ -17,6 +20,6 @@ echo "🚀 Starting Celery worker (concurrency=1)..."
 celery -A hunt_service worker --loglevel=info --concurrency=1 &
 
 # Start the FastAPI application
-echo "🚀 Starting FastAPI backend on port ${PORT:-10000}..."
-# Use uvicorn directly to ensure signal handling and port binding
-exec uvicorn app:app --host 0.0.0.0 --port ${PORT:-10000} --log-level info
+echo "🚀 Starting FastAPI backend on port $PORT..."
+# Use exec to ensure signals are passed to uvicorn
+exec uvicorn app:app --host 0.0.0.0 --port $PORT --log-level info
