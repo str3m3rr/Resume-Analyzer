@@ -288,6 +288,7 @@ This project is optimized for a **Zero-Cost** deployment using the "Hybrid Cloud
    - **Region**: Choose the one closest to you.
    - **Runtime**: `Docker`
    - **Plan**: `Free`
+   - **Root Directory**: `backend` (⚠️ **CRITICAL**: Set this to `backend` so Render finds your Dockerfile)
 5. Add **Environment Variables**:
    - `GROQ_API_KEY`: Your key from [console.groq.com](https://console.groq.com).
    - `PYTHONUNBUFFERED`: `1`
