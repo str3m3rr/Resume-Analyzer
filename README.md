@@ -1,5 +1,6 @@
 # 🛸 Cyber-Purple AI Resume Analyzer
 
+![CI/CD Pipeline](https://github.com/str3m3rr/Resume-Analyzer/actions/workflows/main.yml/badge.svg)
 ![Project Version](https://img.shields.io/badge/version-2.5.0-blueviolet)
 ![Architecture](https://img.shields.io/badge/architecture-distributed-cyan)
 ![ML Model](https://img.shields.io/badge/nlp-all--MiniLM--L6--v2-ff00ff)
@@ -264,6 +265,23 @@ If you are on Windows, you can use the provided shortcuts in the root directory:
 
 > [!NOTE]
 > Make sure **Docker Desktop** is running before using these scripts.
+
+---
+
+## ☁️ 8. Production Deployment (Railway)
+
+This project is optimized for deployment on **Railway**. 
+
+### ⚙️ CI/CD Workflow
+We use **GitHub Actions** to automatically:
+1. **Lint** matching Python/JS code quality.
+2. **Build** Docker images to ensure deployability.
+3. **Cache** dependencies for 2x faster build times.
+
+### 🚀 To Deploy:
+1. Connect your GitHub repository to [Railway.app](https://railway.app).
+2. Railway will automatically detect the `docker-compose.yml` and deploy the services.
+3. Add your `GROQ_API_KEY` to the Railway Environment Variables.
 ```
 
 > **💡 Tip**: The Dockerfile uses `pip install torch --index-url https://download.pytorch.org/whl/cpu` to keep the image under 1GB instead of 4GB+.
