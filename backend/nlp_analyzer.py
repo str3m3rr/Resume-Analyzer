@@ -3,13 +3,24 @@ import re
 import subprocess
 import sys
 
-# Safely load the English AI model (and download it automatically if it's missing!)
-try:
-    nlp = spacy.load("en_core_web_sm")
-except OSError:
-    print("Downloading spaCy English model for the first time...")
-    subprocess.run([sys.executable, "-m", "spacy", "download", "en_core_web_sm"])
-    nlp = spacy.load("en_core_web_sm")
+# Global NLP variable
+_nlp = None
+
+def get_nlp():
+    """Lazy loader for the spaCy model to save memory and speed up startup."""
+    global _nlp
+    if _nlp is None:
+        print("📥 Loading spaCy English model (en_core_web_sm)...")
+        import spacy
+        try:
+            _nlp = spacy.load("en_core_web_sm")
+        except OSError:
+            print("Downloading spaCy English model for the first time...")
+            import subprocess
+            import sys
+            subprocess.run([sys.executable, "-m", "spacy", "download", "en_core_web_sm"])
+            _nlp = spacy.load("en_core_web_sm")
+    return _nlp
 
 def extract_personal_info(text):
     """Scans the document to find contact information."""
@@ -18,7 +29,8 @@ def extract_personal_info(text):
     phone = re.search(r'\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}|\+?\d{1,3}[-.\s]?\d{10}', text)
     
     # NLP for finding names (just scanning the first 1000 characters for speed)
-    doc = nlp(text[:1000])
+    nlp_instance = get_nlp()
+    doc = nlp_instance(text[:1000])
     names = [ent.text for ent in doc.ents if ent.label_ == "PERSON"]
     
     return {
@@ -29,7 +41,8 @@ def extract_personal_info(text):
 
 def analyze_action_verbs(text):
     """Scores how strong the bullet points are based on 'power verbs'."""
-    doc = nlp(text)
+    nlp_instance = get_nlp()
+    doc = nlp_instance(text)
     # Find all verbs in the document
     verbs = [token.lemma_.lower() for token in doc if token.pos_ == "VERB"]
     
@@ -49,7 +62,8 @@ def analyze_action_verbs(text):
 
 def apply_anti_bias(text):
     """Redacts Names, Universities, and Locations to prevent AI bias."""
-    doc = nlp(text)
+    nlp_instance = get_nlp()
+    doc = nlp_instance(text)
     redacted_text = text
     # Loop backward so replacing text doesn't mess up the string indexes
     for ent in reversed(doc.ents):
@@ -83,11 +97,12 @@ def calculate_skill_proximity(detected_skills, missing_skills):
                          [{"id": s, "group": "need"} for s in missing_skills], 
                 "links": []}
     
-    # Load the model (cached after first call)
-    model = SentenceTransformer('all-MiniLM-L6-v2')
+    # Load the model (cached after first call via the global getter)
+    from similarity_model import get_model
+    model_instance = get_model()
     
     # Embed all skill names into vectors
-    embeddings = model.encode(all_skills)
+    embeddings = model_instance.encode(all_skills)
     
     # Compute pairwise similarity matrix
     sim_matrix = cosine_similarity(embeddings)

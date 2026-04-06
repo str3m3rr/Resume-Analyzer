@@ -2,9 +2,17 @@ from sentence_transformers import SentenceTransformer
 from sklearn.metrics.pairwise import cosine_similarity
 import numpy as np
 
-# Load a lightweight, fast, and highly accurate pre-trained model
-print("Loading Sentence Transformer model... (this might take a moment on the first run)")
-model = SentenceTransformer('all-MiniLM-L6-v2')
+# Global model variable
+_model = None
+
+def get_model():
+    """Lazy loader for the SentenceTransformer model to save memory and speed up startup."""
+    global _model
+    if _model is None:
+        print("📥 Loading Sentence Transformer model (all-MiniLM-L6-v2)...")
+        from sentence_transformers import SentenceTransformer
+        _model = SentenceTransformer('all-MiniLM-L6-v2')
+    return _model
 
 def calculate_match_score(resume_text, job_description_text):
     """
@@ -15,7 +23,8 @@ def calculate_match_score(resume_text, job_description_text):
         return 0.0
 
     # 1. Convert the texts into mathematical vectors (embeddings)
-    embeddings = model.encode([resume_text, job_description_text])
+    model_instance = get_model()
+    embeddings = model_instance.encode([resume_text, job_description_text])
     
     resume_vector = embeddings[0].reshape(1, -1)
     job_desc_vector = embeddings[1].reshape(1, -1)
@@ -37,7 +46,8 @@ def calculate_match_score(resume_text, job_description_text):
 def get_similarity_score(text1, text2):
     """Returns a raw 0-1 similarity score between two short strings."""
     if not text1 or not text2: return 0.0
-    emb = model.encode([text1, text2])
+    model_instance = get_model()
+    emb = model_instance.encode([text1, text2])
     return float(cosine_similarity(emb[0].reshape(1, -1), emb[1].reshape(1, -1))[0][0])
 
 def get_bulk_similarity(target_skills, candidate_skills):
@@ -49,8 +59,9 @@ def get_bulk_similarity(target_skills, candidate_skills):
         return []
 
     # 1. Batch encode both lists (High efficiency)
-    target_embs = model.encode(target_skills)
-    candidate_embs = model.encode(candidate_skills)
+    model_instance = get_model()
+    target_embs = model_instance.encode(target_skills)
+    candidate_embs = model_instance.encode(candidate_skills)
     
     # 2. Compute the full similarity matrix (NxM)
     # Result[i][j] = similarity between target[i] and candidate[j]
