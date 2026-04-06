@@ -1,0 +1,22 @@
+I developed a Secure Cross-Platform Data Wiping System using Python, OpenSSL, and Tkinter. To ensure reliability, I wrote automated tests using PyTest and Mocha. The application was containerized using Docker for consistent deployment across enterprise environments.
+I architected Noteables, a MERN stack academic platform handling 500+ files. The backend Express API was deployed to an AWS EC2 instance, and I utilized AWS S3 for scalable media storage. I implemented GraphQL endpoints to optimize how the React frontend fetched complex relational data.
+I built deep-learning models for GNSS Clock & Ephemeris Error Prediction using TensorFlow and PyTorch. The inference engine was designed as a Serverless architecture, utilizing AWS Lambda to trigger predictions whenever new satellite data hit our data lake.
+During the development of the Secure Cross-Platform Data Wiping System, I was responsible for ensuring strict compliance with NIST SP 800-88 guidelines. This required me to dive deep into low-level storage architecture, writing Python scripts capable of executing HPA/DCO unlocking and performing hidden-sector erasure on solid-state drives.
+
+To guarantee the integrity of the data destruction process for enterprise environments, I engineered a cryptographic verification system. I utilized OpenSSL to generate RSA-based digital signatures, which were then embedded into tamper-proof PDF and JSON wipe certificates. I also built a dedicated verification API to allow administrators to programmatically validate these certificates.
+
+I designed the wiping system to be OS-agnostic to prevent host operating systems from interfering with the disk formatting process. I packaged the core Python logic and the Tkinter GUI into a Bootable ISO, allowing IT teams to perform offline, bare-metal sanitization via USB on headless Linux servers and Windows machines.
+
+While architecting Noteables, a comprehensive academic resource platform, I built a highly scalable RESTful API using Node.js and Express.js. Because the platform needed to handle and organize over 500 distinct files by semester, I integrated MongoDB for flexible document storage and enforced strict data integrity across all endpoints using Zod schema validation.
+
+Frontend performance was a major priority for Noteables. I noticed that high-resolution document previews were bottlenecking the React application. To solve this, I integrated Cloudinary as a global CDN for media storage. By implementing lazy loading and optimizing asset delivery at the edge, I successfully cut average image load times by over 60%.
+
+To secure the Noteables platform and manage user sessions, I implemented a robust authentication flow. I utilized Firebase Auth for identity management and generated JSON Web Tokens (JWT) to secure protected API routes, ensuring that students only had access to appropriate semester materials.
+
+For the Smart India Hackathon, I tackled complex time-series forecasting by developing deep-learning models to predict GNSS satellite clock and ephemeris errors. I utilized Python, Pandas, and NumPy to preprocess massive 7-day historical datasets, cleaning the data and engineering features to predict the unseen 8th day at precise 15-minute intervals.
+
+I experimented extensively with different neural network architectures for the GNSS prediction engine. I built and trained baseline models using LSTMs and GRUs in TensorFlow and PyTorch. To push accuracy further for multi-horizon predictions up to 24 hours, I transitioned to evaluating advanced sequence models, including Transformers and GAN-based generative architectures.
+
+Beyond application code, I have hands-on experience managing deployment infrastructure and cloud services. I am comfortable working in Linux environments and have utilized AWS services, specifically EC2 for hosting backend APIs and S3 for scalable object storage.
+
+To ensure consistent environments from development to production, I utilize Docker for containerization. I have experience writing Dockerfiles and docker-compose scripts to orchestrate multi-container architectures, successfully networking complex frontend, backend, and database microservices together on local and remote machines.

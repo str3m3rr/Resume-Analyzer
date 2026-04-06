@@ -1,0 +1,36 @@
+version: '3.8'
+
+services:
+  backend:
+    build: ./backend
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./backend:/app  # This syncs your local code to the container so you don't have to rebuild on every change
+    environment:
+      - PYTHONUNBUFFERED=1
+      - GROQ_API_KEY=${GROQ_API_KEY}
+
+  frontend:
+    build: ./frontend
+    ports:
+      - "5173:80"
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules # Prevents local node_modules from overwriting the container's
+    depends_on:
+      - backend
+  redis:
+    image: redis:alpine
+    ports:
+      - "6379:6379"
+
+  worker:
+    build: ./backend
+    command: celery -A tasks worker --loglevel=info
+    volumes:
+      - ./backend:/app
+    env_file: ./backend/.env
+    depends_on:
+      - redis
+      - backend
