@@ -1,4 +1,4 @@
-# 🛸 Cyber-Purple AI Resume Analyzer
+# 🛸 AI Resume Analyzer
 
 ![CI/CD Pipeline](https://github.com/str3m3rr/Resume-Analyzer/actions/workflows/main.yml/badge.svg)
 ![Project Version](https://img.shields.io/badge/version-2.5.0-blueviolet)
