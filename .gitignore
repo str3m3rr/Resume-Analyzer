@@ -21,6 +21,7 @@ wheels/
 .installed.cfg
 *.egg
 backend/venv/
+.env
 backend/.env
 backend/uploads/
 backend/chroma_data/

@@ -15,12 +15,19 @@ ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
 ENV PYTHONMALLOC=malloc
 
+# Upgrade pip and base packaging tools, and pre-install typing-extensions to avoid wheel name metadata bugs
+RUN pip install --no-cache-dir --upgrade pip setuptools wheel && \
+    pip install --no-cache-dir typing-extensions
+
 # Copy the requirements file
 COPY requirements.txt .
 
 # FIX 1: Install CPU-only PyTorch first (saves space)
 RUN pip install --no-cache-dir torch --index-url https://download.pytorch.org/whl/cpu \
-    --trusted-host download.pytorch.org
+    --extra-index-url https://pypi.org/simple \
+    --trusted-host download.pytorch.org \
+    --trusted-host pypi.org \
+    --trusted-host files.pythonhosted.org
 
 # FIX 2: Install everything else
 RUN pip install --no-cache-dir -r requirements.txt \
@@ -36,16 +43,16 @@ COPY download_models.py .
 RUN python download_models.py
 
 # Set default port
-ENV PORT=10000
+ENV PORT=8000
 
 # Copy the rest of your Python files
 COPY . .
 
-# Expose the FastAPI default port
-EXPOSE 10000
+# Expose the FastAPI port
+EXPOSE 8000
 
-# Make start script executable
-RUN chmod +x start.sh
+# Strip carriage returns in start.sh and make start script executable
+RUN sed -i 's/\r$//' start.sh && chmod +x start.sh
 
-# Run the All-in-One startup script
+# Run the startup script
 CMD ["/bin/bash", "start.sh"]

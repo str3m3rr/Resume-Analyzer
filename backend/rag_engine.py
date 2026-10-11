@@ -19,11 +19,15 @@ def initialize_memory():
     if collection.count() > 0:
         return
 
-    if not os.path.exists("master_experience.txt"):
+    base_dir = os.path.dirname(os.path.abspath(__file__))
+    file_path = os.path.join(base_dir, "master_experience.txt")
+    if not os.path.exists(file_path):
+        file_path = "master_experience.txt"
+    if not os.path.exists(file_path):
         print("Warning: master_experience.txt not found!")
         return
 
-    with open("master_experience.txt", "r", encoding="utf-8") as file:
+    with open(file_path, "r", encoding="utf-8") as file:
         content = file.read()
     
     # Split the document by newlines (each paragraph is one "memory")

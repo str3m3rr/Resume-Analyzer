@@ -16,13 +16,15 @@ def load_skills_database():
         return _skills_db_cache
     
     base_dir = os.path.dirname(os.path.abspath(__file__))
-    csv_path = os.path.join(base_dir, "..", "datasets", "skills_database.csv")
+    csv_path = os.path.join(base_dir, "datasets", "skills_database.csv")
+    if not os.path.exists(csv_path):
+        csv_path = os.path.join(base_dir, "..", "datasets", "skills_database.csv")
     
     try:
         df = pd.read_csv(csv_path)
         _skills_db_cache = set(df['skill'].dropna().str.lower().str.strip().tolist())
     except Exception as e:
-        print(f"Warning: Could not load skills CSV. {e}")
+        print(f"Warning: Could not load skills CSV from {csv_path}. {e}")
         _skills_db_cache = {"python", "sql", "java", "react", "machine learning", "docker", "aws"}
     
     return _skills_db_cache
