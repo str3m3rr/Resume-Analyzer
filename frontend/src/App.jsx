@@ -1,9 +1,10 @@
 import SkillGraph from './SkillGraph';
 import ExplainabilityPanel from './ExplainabilityPanel';
 import FairnessReport from './FairnessReport';
+import AIInterviewModal from './AIInterviewModal';
 import { ATSVisualizer, AIStrictnessSlider, ServerTelemetry, JobMarketRadar, FloatingActionDock } from './AIExtensions';
 import { useState, useEffect, useRef } from 'react';
-import { analyzeResume } from './api';
+import { analyzeResume, rewriteBullet, startHunt, getHuntResults } from './api';
 import { jsPDF } from 'jspdf';
 import { Chart as ChartJS, ArcElement, Tooltip, Legend, RadialLinearScale, PointElement, LineElement, Filler } from 'chart.js';
 import { Doughnut, Radar } from 'react-chartjs-2';
@@ -74,6 +75,9 @@ function App() {
   });
   const [showNotifications, setShowNotifications] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
+  const [showInterview, setShowInterview] = useState(false);
+  const [interviewDifficulty, setInterviewDifficulty] = useState('medium');
+  const [interviewQuestionCount, setInterviewQuestionCount] = useState(5);
   const confettiFired = useRef(false);
 
   useEffect(() => {
@@ -332,16 +336,11 @@ function App() {
     if (!originalBullet) return;
     setIsRewriting(true); setRewrittenBullet("");
     try {
-      const response = await fetch("http://localhost:8000/api/rewrite", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          original_bullet: originalBullet,
-          target_skill: rewriteTarget,
-          job_role: jobDescription.substring(0, 50)
-        }),
+      const data = await rewriteBullet({
+        original_bullet: originalBullet,
+        target_skill: rewriteTarget,
+        job_role: jobDescription.substring(0, 50)
       });
-      const data = await response.json();
       setRewrittenBullet(data.status === "success" ? data.rewritten_text : "AI hit a snag.");
     } catch (err) {
       setRewrittenBullet("Connection error.");
@@ -353,16 +352,10 @@ function App() {
   const handleHuntMode = async () => {
     setHuntLoading(true); setHuntResults(null);
     try {
-      const response = await fetch("http://localhost:8000/api/hunt", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ resume_text: results.extracted_text }),
-      });
-      const { task_id } = await response.json();
+      const { task_id } = await startHunt(results.extracted_text);
       const poll = setInterval(async () => {
         try {
-          const res = await fetch(`http://localhost:8000/api/hunt-results/${task_id}`);
-          const data = await res.json();
+          const data = await getHuntResults(task_id);
           if (data.status === "complete") { 
             clearInterval(poll); 
             setHuntResults(data.data); 
@@ -711,6 +704,7 @@ function App() {
                           <div className="absolute inset-0 flex flex-col items-center justify-center">
                             <span className="text-3xl font-black text-theme">{displayScore}%</span>
                           </div>
+
                         </div>
                         <div className="min-w-0">
                           <h2 className="text-lg font-black text-theme flex items-center gap-1.5 mb-1"><Target className="w-4 h-4 text-[#B829FF]" /> Alignment Score {getScoreEmoji(results.match_score).emoji}</h2>
@@ -724,6 +718,70 @@ function App() {
                         </div>
                       </div>
                       {getRadarData() && <div className="w-full md:w-52 flex-shrink-0 cyan-glow rounded-xl p-2"><Radar data={getRadarData()} options={radarOpts} /></div>}
+                    </div>
+
+                    <div className="cyber-card p-5 space-y-4" style={{ borderColor: 'rgba(0, 229, 255, 0.25)' }}>
+                      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                        <div>
+                          <div className="flex items-center gap-2 mb-1">
+                            <p className="eyebrow">NEW · REAL-TIME PRACTICE</p>
+                            {results?.interview_questions && (
+                              <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-[#00FF88]/15 text-[#00FF88] border border-[#00FF88]/30 flex items-center gap-1">
+                                <Sparkles className="w-3 h-3" /> 15 Groq AI Questions Pre-Loaded
+                              </span>
+                            )}
+                          </div>
+                          <h3 className="text-lg font-black text-theme">Run an AI mock interview</h3>
+                          <p className="text-sm text-[#94A3B8] mt-0.5">Dynamic Groq AI questions generated from your parsed resume and job requirements.</p>
+                        </div>
+                        <button onClick={() => setShowInterview(true)} className="interview-launch">Start interview <ArrowRight className="w-4 h-4" /></button>
+                      </div>
+
+                      {/* Controls: Difficulty & Question Count */}
+                      <div className="flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-white/5">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="text-xs font-bold text-[#94A3B8]">Difficulty:</span>
+                          <div className="flex gap-1.5">
+                            <button
+                              type="button"
+                              onClick={() => setInterviewDifficulty('easy')}
+                              className={`diff-pill ${interviewDifficulty === 'easy' ? 'active-easy' : ''}`}
+                            >
+                              Easy
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setInterviewDifficulty('medium')}
+                              className={`diff-pill ${interviewDifficulty === 'medium' ? 'active-medium' : ''}`}
+                            >
+                              Medium
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setInterviewDifficulty('hard')}
+                              className={`diff-pill ${interviewDifficulty === 'hard' ? 'active-hard' : ''}`}
+                            >
+                              Hard
+                            </button>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs font-bold text-[#94A3B8]">Questions:</span>
+                          <div className="flex gap-1.5">
+                            {[3, 5, 8].map(count => (
+                              <button
+                                key={count}
+                                type="button"
+                                onClick={() => setInterviewQuestionCount(count)}
+                                className={`count-pill ${interviewQuestionCount === count ? 'active' : ''}`}
+                              >
+                                {count} Qs
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
                     </div>
                   </div>
 
@@ -842,6 +900,16 @@ function App() {
           </div>
         </div>
       </div>
+      {showInterview && (
+        <AIInterviewModal
+          resume={results?.extracted_text || ''}
+          jd={jobDescription}
+          initialDifficulty={interviewDifficulty}
+          initialQuestionCount={interviewQuestionCount}
+          preloadedPool={results?.interview_questions}
+          onClose={() => setShowInterview(false)}
+        />
+      )}
     </div>
   );
 }

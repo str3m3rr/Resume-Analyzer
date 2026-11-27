@@ -10,42 +10,44 @@ RUN apt-get update && apt-get install -y \
 # Set the working directory inside the container
 WORKDIR /app
 
-# RAM Optimizations for Python
+# RAM Optimizations for Python & ONNX Runtime on 512MB Render Free Tier
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
 ENV PYTHONMALLOC=malloc
+ENV OMP_NUM_THREADS=1
+ENV OPENBLAS_NUM_THREADS=1
+ENV MKL_NUM_THREADS=1
+ENV FASTEMBED_CACHE_PATH=/app/.cache/fastembed
 
-# Copy the requirements file
+# Upgrade pip and base packaging tools
+RUN pip install --no-cache-dir --upgrade pip setuptools wheel && \
+    pip install --no-cache-dir typing-extensions
+
+# Copy the requirements file and install lightweight CPU/ONNX dependencies
 COPY requirements.txt .
-
-# FIX 1: Install CPU-only PyTorch first (saves space)
-RUN pip install --no-cache-dir torch --index-url https://download.pytorch.org/whl/cpu \
-    --trusted-host download.pytorch.org
-
-# FIX 2: Install everything else
 RUN pip install --no-cache-dir -r requirements.txt \
     --trusted-host pypi.org \
     --trusted-host pypi.python.org \
     --trusted-host files.pythonhosted.org
 
-# FIX 3: Fetch spaCy dictionary
+# Fetch spaCy English model
 RUN pip install --no-cache-dir https://github.com/explosion/spacy-models/releases/download/en_core_web_sm-3.7.1/en_core_web_sm-3.7.1.tar.gz
 
-# Pre-download ML models (SBERT and spaCy)
+# Pre-download ML models (FastEmbed ONNX all-MiniLM-L6-v2 and spaCy)
 COPY download_models.py .
 RUN python download_models.py
 
 # Set default port
-ENV PORT=10000
+ENV PORT=8000
 
 # Copy the rest of your Python files
 COPY . .
 
-# Expose the FastAPI default port
-EXPOSE 10000
+# Expose the FastAPI port
+EXPOSE 8000
 
-# Make start script executable
-RUN chmod +x start.sh
+# Strip carriage returns in start.sh and make start script executable
+RUN sed -i 's/\r$//' start.sh && chmod +x start.sh
 
-# Run the All-in-One startup script
+# Run the startup script
 CMD ["/bin/bash", "start.sh"]

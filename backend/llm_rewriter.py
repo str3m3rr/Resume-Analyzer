@@ -23,12 +23,13 @@ def rewrite_bullet_point(original_bullet, target_skill, job_role, api_key, memor
 
     try:
         completion = client.chat.completions.create(
-            model="llama-3.1-8b-instant", 
+            model=os.getenv("GROQ_MODEL", "qwen/qwen3.8-27b"),
             messages=[
                 {"role": "system", "content": "You are a precise resume editing API. Output only the requested rewritten text."},
                 {"role": "user", "content": prompt}
             ],
             temperature=0.3, # Lowered temperature to force it to stick to the facts
+            max_tokens=300,
         )
         return completion.choices[0].message.content.strip()
     except Exception as e:

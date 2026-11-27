@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Shield, AlertTriangle, CheckCircle2, Scale, ChevronDown, ChevronUp, Loader2 } from 'lucide-react';
+import { runBiasAudit } from './api';
 
 export default function FairnessReport({ jobDescription, resumeText, onAuditComplete }) {
   const [auditData, setAuditData] = useState(null);
@@ -10,12 +11,7 @@ export default function FairnessReport({ jobDescription, resumeText, onAuditComp
   const runAudit = async () => {
     setLoading(true); setError(null);
     try {
-      const response = await fetch("http://localhost:8000/api/bias-audit", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ job_description: jobDescription, resume_text: resumeText || null }),
-      });
-      const data = await response.json();
+      const data = await runBiasAudit(jobDescription, resumeText);
       if (data.status === "success") {
         setAuditData(data);
         if (onAuditComplete) onAuditComplete(data);

@@ -1,4 +1,3 @@
-import spacy
 import re
 import subprocess
 import sys
@@ -86,7 +85,6 @@ def calculate_skill_proximity(detected_skills, missing_skills):
     3. Only draw edges where similarity > threshold (real connections)
     4. Edge thickness = similarity strength
     """
-    from sentence_transformers import SentenceTransformer
     from sklearn.metrics.pairwise import cosine_similarity
     import numpy as np
     

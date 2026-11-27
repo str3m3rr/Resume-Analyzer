@@ -1,6 +1,15 @@
-from fastapi import FastAPI, File, UploadFile, Form, HTTPException
-from fastapi.middleware.cors import CORSMiddleware
 import io
+import os
+import uuid
+from collections import OrderedDict
+from typing import Optional
+
+from dotenv import load_dotenv
+from fastapi import BackgroundTasks, FastAPI, File, Form, HTTPException, UploadFile
+from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel
+
+load_dotenv()
 
 # Import your core ML modules
 from resume_parser import extract_text_from_pdf
@@ -14,19 +23,78 @@ from nlp_analyzer import extract_personal_info, analyze_action_verbs, apply_anti
 # Import research-grade XAI and Bias Auditing engines
 from explainability import build_cross_attention_matrix
 from bias_auditor import audit_job_description, run_adversarial_fairness_test
+from hunt_service import run_hunt_pipeline
+from llm_rewriter import rewrite_bullet_point
+from rag_engine import initialize_memory, retrieve_relevant_memory
+from interview_service import (
+    InterviewStartRequest,
+    InterviewTurnRequest,
+    start_interview,
+    turn_interview,
+    generate_interview_pool,
+)
 
 app = FastAPI(title="AI Resume Analyzer API")
 print("🚀 FASTAPI APP INITIALIZED - WAITING FOR REQUESTS")
 
-# Update CORS for production
-# In production, Replace "*" with your actual frontend domain
+# Configure CORS via ALLOWED_ORIGINS (comma-separated in production, "*" for open/local)
+_raw_origins = os.getenv("ALLOWED_ORIGINS", "*").strip()
+if _raw_origins == "*":
+    _allow_origins = ["*"]
+    _allow_credentials = False
+else:
+    _allow_origins = [o.strip().rstrip("/") for o in _raw_origins.split(",") if o.strip()]
+    _allow_credentials = True
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
+    allow_origins=_allow_origins,
+    allow_credentials=_allow_credentials,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+@app.get("/")
+async def root():
+    return {"status": "ok", "service": "AI Resume Analyzer API", "health": "/health"}
+
+@app.post("/api/interview/start")
+async def interview_start(request: InterviewStartRequest):
+    return start_interview(request)
+
+@app.post("/api/interview/turn")
+async def interview_turn(request: InterviewTurnRequest):
+    return turn_interview(request)
+
+@app.post("/api/interview/transcribe")
+@app.post("/api/transcribe")
+async def transcribe_interview_audio(file: UploadFile = File(...)):
+    """Transcribes user voice recording using Groq Whisper API (whisper-large-v3-turbo)."""
+    api_key = os.environ.get("GROQ_API_KEY")
+    if not api_key or api_key in {"your_key_here", "your_groq_api_key_here"}:
+        raise HTTPException(status_code=500, detail="Groq API key is missing on the server.")
+
+    try:
+        from groq import Groq
+        audio_bytes = await file.read()
+        if not audio_bytes or len(audio_bytes) < 300:
+            return {"status": "success", "text": ""}
+
+        filename = file.filename or "interview_answer.webm"
+        file_tuple = (filename, audio_bytes, file.content_type or "audio/webm")
+
+        client = Groq(api_key=api_key)
+        transcription = client.audio.transcriptions.create(
+            file=file_tuple,
+            model="whisper-large-v3-turbo",
+            response_format="json",
+            temperature=0.0
+        )
+        return {"status": "success", "text": transcription.text.strip()}
+    except Exception as e:
+        print(f"Whisper transcription error: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Audio transcription error: {str(e)}")
 
 @app.get("/health")
 async def health_check():
@@ -108,6 +176,11 @@ async def analyze_resume(
         # 7. Generate the Proximity Graph data
         proximity_graph = calculate_skill_proximity(detected_skills, analysis["missing_skills"])
             
+        # 8. Pre-load dynamic multi-tier interview questions (Easy, Medium, Hard) via Groq
+        interview_questions = generate_interview_pool(
+            processing_text, job_description, detected_skills, analysis.get("missing_skills", [])
+        )
+
         return {
             "status": "success",
             "is_blind_screened": anti_bias_mode,
@@ -119,18 +192,12 @@ async def analyze_resume(
             "verb_analysis": verb_analysis,
             "proximity_graph": proximity_graph,
             "extracted_text": processing_text,
-            "explainability": explainability_data
+            "explainability": explainability_data,
+            "interview_questions": interview_questions,
         }
     except Exception as e:
         print(f"BACKEND ERROR: {str(e)}") # This will print exact errors to your terminal
         raise HTTPException(status_code=500, detail=str(e))
-from pydantic import BaseModel
-from llm_rewriter import rewrite_bullet_point
-from rag_engine import initialize_memory, retrieve_relevant_memory # <-- IMPORT ADDED HERE
-import os
-
-# Removed top-level initialize_memory() to save RAM during startup
-
 # Create a data model for the incoming React request
 class RewriteRequest(BaseModel):
     original_bullet: str
@@ -165,20 +232,60 @@ async def rewrite_resume_bullet(request: RewriteRequest):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-from tasks import hunt_jobs
-from celery.result import AsyncResult
+
+def _use_celery_hunt() -> bool:
+    """Use Celery only when explicitly enabled (disabled by default on Render free tier)."""
+    default_flag = "false" if os.getenv("RENDER", "").lower() == "true" else "true"
+    return os.getenv("START_CELERY", default_flag).lower() == "true"
+
+
+_local_hunt_jobs: "OrderedDict[str, dict]" = OrderedDict()
+_MAX_HUNT_HISTORY = 50
+
+
+def _run_local_hunt(task_id: str, resume_text: str) -> None:
+    _local_hunt_jobs[task_id] = {"status": "running", "message": "Scraping job boards..."}
+    try:
+        data = run_hunt_pipeline(resume_text)
+        _local_hunt_jobs[task_id] = {"status": "complete", "data": data}
+    except Exception as exc:
+        _local_hunt_jobs[task_id] = {"status": "failed", "message": str(exc)}
+
 
 @app.post("/api/hunt")
-async def start_hunt(request: dict):
-    # This triggers the task in the background and returns immediately
-    task = hunt_jobs.delay(request['resume_text'])
-    return {"status": "Hunting started", "task_id": task.id}
+async def start_hunt(request: dict, background_tasks: BackgroundTasks):
+    resume_text = request.get("resume_text", "")
+    if not resume_text:
+        raise HTTPException(status_code=400, detail="resume_text is required.")
+
+    if _use_celery_hunt():
+        from tasks import hunt_jobs
+
+        task = hunt_jobs.delay(resume_text)
+        return {"status": "Hunting started", "task_id": task.id}
+
+    task_id = str(uuid.uuid4())
+    while len(_local_hunt_jobs) >= _MAX_HUNT_HISTORY:
+        _local_hunt_jobs.popitem(last=False)
+    _local_hunt_jobs[task_id] = {"status": "pending", "message": "Still hunting..."}
+    background_tasks.add_task(_run_local_hunt, task_id, resume_text)
+    return {"status": "Hunting started", "task_id": task_id}
+
 
 @app.get("/api/hunt-results/{task_id}")
 async def get_hunt_results(task_id: str):
     """Poll for hunt mode results by task ID."""
+    if not _use_celery_hunt() or task_id in _local_hunt_jobs:
+        job = _local_hunt_jobs.get(task_id)
+        if not job:
+            return {"status": "failed", "message": "Hunt job not found or expired."}
+        return job
+
+    from celery.result import AsyncResult
+    from tasks import hunt_jobs
+
     result = AsyncResult(task_id, app=hunt_jobs.app)
-    
+
     if result.state == "PENDING":
         return {"status": "pending", "message": "Still hunting..."}
     elif result.state == "STARTED":
@@ -187,6 +294,7 @@ async def get_hunt_results(task_id: str):
         return {"status": "complete", "data": result.result}
     elif result.state == "FAILURE":
         return {"status": "failed", "message": str(result.info)}
+    return {"status": "pending", "message": "Still hunting..."}
 
 
 # ============================================================================
@@ -195,7 +303,7 @@ async def get_hunt_results(task_id: str):
 
 class BiasAuditRequest(BaseModel):
     job_description: str
-    resume_text: str = None  # Optional: needed for adversarial model testing
+    resume_text: Optional[str] = None  # Optional: needed for adversarial model testing
 
 @app.post("/api/bias-audit")
 async def bias_audit(request: BiasAuditRequest):
