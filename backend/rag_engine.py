@@ -1,22 +1,21 @@
-# Global holders for lazy initialization
-import os
-_chroma_client = None
-_memory_collection = None
+"""Lightweight in-memory RAG engine using the shared Sentence-BERT model.
 
-def _get_collection():
-    """Initializes the ChromaDB client and collection only when needed."""
-    global _chroma_client, _memory_collection
-    if _memory_collection is None:
-        import chromadb
-        _chroma_client = chromadb.PersistentClient(path="./chroma_data")
-        _memory_collection = _chroma_client.get_or_create_collection(name="resume_memories")
-    return _memory_collection
+Replaces ChromaDB's separate ONNX runtime so the backend stays within
+Render's 512 MB free-tier memory limit while keeping identical behavior.
+"""
+import os
+from typing import List, Optional
+import numpy as np
+from sklearn.metrics.pairwise import cosine_similarity
+
+_memories: List[str] = []
+_memory_embeddings: Optional[np.ndarray] = None
+
 
 def initialize_memory():
-    """Reads the master text file and loads it into the vector database."""
-    # Check if we already loaded it to avoid duplicates
-    collection = _get_collection()
-    if collection.count() > 0:
+    """Reads master_experience.txt and embeds each paragraph once using SBERT."""
+    global _memories, _memory_embeddings
+    if _memory_embeddings is not None and _memories:
         return
 
     base_dir = os.path.dirname(os.path.abspath(__file__))
@@ -29,31 +28,31 @@ def initialize_memory():
 
     with open(file_path, "r", encoding="utf-8") as file:
         content = file.read()
-    
-    # Split the document by newlines (each paragraph is one "memory")
-    memories = [m.strip() for m in content.split('\n') if m.strip()]
-    
-    # Generate unique IDs for each memory chunk
-    ids = [f"mem_{i}" for i in range(len(memories))]
-    
-    # Add to the database
-    collection.add(
-        documents=memories,
-        ids=ids
-    )
-    print(f"Successfully loaded {len(memories)} memories into ChromaDB!")
+
+    memories = [m.strip() for m in content.split("\n") if m.strip()]
+    if not memories:
+        return
+
+    from similarity_model import get_model
+
+    model_instance = get_model()
+    _memories = memories
+    _memory_embeddings = model_instance.encode(memories)
+    print(f"Successfully loaded {len(_memories)} memories into in-memory RAG!")
+
 
 def retrieve_relevant_memory(target_skill: str) -> str:
-    """Searches the database for the closest matching experience."""
-    collection = _get_collection()
-    if collection.count() == 0:
+    """Searches memory embeddings for the closest matching experience."""
+    if _memory_embeddings is None or not _memories:
+        initialize_memory()
+
+    if _memory_embeddings is None or not _memories:
         return "No extended background context available."
 
-    results = collection.query(
-        query_texts=[target_skill],
-        n_results=1 # Just get the single most relevant memory
-    )
-    
-    if results['documents'] and results['documents'][0]:
-        return results['documents'][0][0]
-    return "No relevant past experience found for this skill."
+    from similarity_model import get_model
+
+    model_instance = get_model()
+    query_emb = model_instance.encode([target_skill])
+    sims = cosine_similarity(query_emb, _memory_embeddings)[0]
+    best_idx = int(np.argmax(sims))
+    return _memories[best_idx]

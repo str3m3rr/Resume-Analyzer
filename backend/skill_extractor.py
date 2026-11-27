@@ -1,10 +1,6 @@
-import spacy
 import pandas as pd
 import os
 import re
-
-# Load the spaCy English language model
-nlp = spacy.load("en_core_web_sm")
 
 # Load skills database ONCE at module level (not per-call)
 _skills_db_cache = None

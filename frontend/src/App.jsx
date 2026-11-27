@@ -4,7 +4,7 @@ import FairnessReport from './FairnessReport';
 import AIInterviewModal from './AIInterviewModal';
 import { ATSVisualizer, AIStrictnessSlider, ServerTelemetry, JobMarketRadar, FloatingActionDock } from './AIExtensions';
 import { useState, useEffect, useRef } from 'react';
-import { analyzeResume } from './api';
+import { analyzeResume, rewriteBullet, startHunt, getHuntResults } from './api';
 import { jsPDF } from 'jspdf';
 import { Chart as ChartJS, ArcElement, Tooltip, Legend, RadialLinearScale, PointElement, LineElement, Filler } from 'chart.js';
 import { Doughnut, Radar } from 'react-chartjs-2';
@@ -336,16 +336,11 @@ function App() {
     if (!originalBullet) return;
     setIsRewriting(true); setRewrittenBullet("");
     try {
-      const response = await fetch("http://localhost:8000/api/rewrite", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          original_bullet: originalBullet,
-          target_skill: rewriteTarget,
-          job_role: jobDescription.substring(0, 50)
-        }),
+      const data = await rewriteBullet({
+        original_bullet: originalBullet,
+        target_skill: rewriteTarget,
+        job_role: jobDescription.substring(0, 50)
       });
-      const data = await response.json();
       setRewrittenBullet(data.status === "success" ? data.rewritten_text : "AI hit a snag.");
     } catch (err) {
       setRewrittenBullet("Connection error.");
@@ -357,16 +352,10 @@ function App() {
   const handleHuntMode = async () => {
     setHuntLoading(true); setHuntResults(null);
     try {
-      const response = await fetch("http://localhost:8000/api/hunt", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ resume_text: results.extracted_text }),
-      });
-      const { task_id } = await response.json();
+      const { task_id } = await startHunt(results.extracted_text);
       const poll = setInterval(async () => {
         try {
-          const res = await fetch(`http://localhost:8000/api/hunt-results/${task_id}`);
-          const data = await res.json();
+          const data = await getHuntResults(task_id);
           if (data.status === "complete") { 
             clearInterval(poll); 
             setHuntResults(data.data); 

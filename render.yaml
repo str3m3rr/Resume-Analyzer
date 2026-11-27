@@ -1,0 +1,18 @@
+services:
+  - type: web
+    name: resume-analyzer-api
+    runtime: docker
+    rootDir: backend
+    plan: free
+    healthCheckPath: /health
+    envVars:
+      - key: PYTHONUNBUFFERED
+        value: "1"
+      - key: START_LOCAL_REDIS
+        value: "false"
+      - key: START_CELERY
+        value: "false"
+      - key: ALLOWED_ORIGINS
+        value: "*"
+      - key: GROQ_API_KEY
+        sync: false

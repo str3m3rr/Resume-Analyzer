@@ -63,8 +63,7 @@ def extract_keywords(resume_text, max_keywords=5):
     return keywords
 
 
-@app.task(bind=True)
-def hunt_jobs(self, resume_text):
+def run_hunt_pipeline(resume_text):
     """
     Scrapes multiple job boards using resume-derived search keywords,
     scores each against the resume, and returns high-match results.
@@ -222,3 +221,9 @@ def hunt_jobs(self, resume_text):
     
     print(f"\n🏁 Hunt complete! Scanned {len(all_jobs)} jobs, found {len(matched_jobs)} matches.")
     return result
+
+
+@app.task(bind=True)
+def hunt_jobs(self, resume_text):
+    """Celery task wrapper around run_hunt_pipeline."""
+    return run_hunt_pipeline(resume_text)
