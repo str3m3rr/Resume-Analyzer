@@ -1,6 +1,9 @@
 from fastapi import FastAPI, File, UploadFile, Form, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 import io
+from dotenv import load_dotenv
+
+load_dotenv()
 
 # Import your core ML modules
 from resume_parser import extract_text_from_pdf
@@ -14,6 +17,13 @@ from nlp_analyzer import extract_personal_info, analyze_action_verbs, apply_anti
 # Import research-grade XAI and Bias Auditing engines
 from explainability import build_cross_attention_matrix
 from bias_auditor import audit_job_description, run_adversarial_fairness_test
+from interview_service import (
+    InterviewStartRequest,
+    InterviewTurnRequest,
+    start_interview,
+    turn_interview,
+    generate_interview_pool,
+)
 
 app = FastAPI(title="AI Resume Analyzer API")
 print("🚀 FASTAPI APP INITIALIZED - WAITING FOR REQUESTS")
@@ -27,6 +37,43 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+@app.post("/api/interview/start")
+async def interview_start(request: InterviewStartRequest):
+    return start_interview(request)
+
+@app.post("/api/interview/turn")
+async def interview_turn(request: InterviewTurnRequest):
+    return turn_interview(request)
+
+@app.post("/api/interview/transcribe")
+@app.post("/api/transcribe")
+async def transcribe_interview_audio(file: UploadFile = File(...)):
+    """Transcribes user voice recording using Groq Whisper API (whisper-large-v3-turbo)."""
+    api_key = os.environ.get("GROQ_API_KEY")
+    if not api_key or api_key in {"your_key_here", "your_groq_api_key_here"}:
+        raise HTTPException(status_code=500, detail="Groq API key is missing on the server.")
+
+    try:
+        from groq import Groq
+        audio_bytes = await file.read()
+        if not audio_bytes or len(audio_bytes) < 300:
+            return {"status": "success", "text": ""}
+
+        filename = file.filename or "interview_answer.webm"
+        file_tuple = (filename, audio_bytes, file.content_type or "audio/webm")
+
+        client = Groq(api_key=api_key)
+        transcription = client.audio.transcriptions.create(
+            file=file_tuple,
+            model="whisper-large-v3-turbo",
+            response_format="json",
+            temperature=0.0
+        )
+        return {"status": "success", "text": transcription.text.strip()}
+    except Exception as e:
+        print(f"Whisper transcription error: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Audio transcription error: {str(e)}")
 
 @app.get("/health")
 async def health_check():
@@ -108,6 +155,11 @@ async def analyze_resume(
         # 7. Generate the Proximity Graph data
         proximity_graph = calculate_skill_proximity(detected_skills, analysis["missing_skills"])
             
+        # 8. Pre-load dynamic multi-tier interview questions (Easy, Medium, Hard) via Groq
+        interview_questions = generate_interview_pool(
+            processing_text, job_description, detected_skills, analysis.get("missing_skills", [])
+        )
+
         return {
             "status": "success",
             "is_blind_screened": anti_bias_mode,
@@ -119,7 +171,8 @@ async def analyze_resume(
             "verb_analysis": verb_analysis,
             "proximity_graph": proximity_graph,
             "extracted_text": processing_text,
-            "explainability": explainability_data
+            "explainability": explainability_data,
+            "interview_questions": interview_questions,
         }
     except Exception as e:
         print(f"BACKEND ERROR: {str(e)}") # This will print exact errors to your terminal

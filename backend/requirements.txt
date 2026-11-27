@@ -13,3 +13,4 @@ celery
 redis
 beautifulsoup4
 requests
+python-dotenv

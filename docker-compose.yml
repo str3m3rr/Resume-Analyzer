@@ -21,6 +21,22 @@ services:
     build: ./frontend
     ports:
       - "5173:80"
+    volumes:
+      - ./frontend/dist:/usr/share/nginx/html:ro
+    depends_on:
+      - backend
+
+  interview-gateway:
+    image: node:20-alpine
+    working_dir: /app
+    command: sh -c "npm install --omit=dev && npm start"
+    volumes:
+      - ./interview-service:/app
+    ports:
+      - "3001:3001"
+    environment:
+      - PORT=3001
+      - PYTHON_API_URL=http://backend:8000
     depends_on:
       - backend
 
